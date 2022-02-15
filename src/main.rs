@@ -2,12 +2,14 @@ use clap::Parser;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server};
 use hyper::{Method, StatusCode};
+use regex::Regex;
 use std::net::SocketAddr;
 use tokio::fs;
 
 async fn file(req: Request<Body>) -> Result<Response<Body>, std::io::Error> {
+    let _path = Regex::new(r"^/./*").unwrap().as_str();
     match (req.method(), req.uri().path()) {
-        (&Method::GET, "/") => {
+        (&Method::GET, _path) => {
             let args = Args::parse();
 
             let file = match fs::read(args.name).await {
