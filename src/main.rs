@@ -2,18 +2,23 @@ use clap::Parser;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server};
 use hyper::{Method, StatusCode};
-use std::fs;
+use std::net::SocketAddr;
+use tokio::fs;
 
-use std::{convert::Infallible, net::SocketAddr};
-
-async fn file(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+async fn file(req: Request<Body>) -> Result<Response<Body>, std::io::Error> {
     match (req.method(), req.uri().path()) {
-        (&Method::GET, "/") => Ok(Response::new(Body::from("hi"))),
-        (&Method::GET, "/file.txt") => {
+        (&Method::GET, "/") => {
             let args = Args::parse();
 
-            let file =
-                fs::read_to_string(args.name).expect("something went wrong reading the file");
+            let file = match fs::read(args.name).await {
+                Ok(file) => file,
+                Err(_) => {
+                    return Ok(Response::builder()
+                        .status(StatusCode::INTERNAL_SERVER_ERROR)
+                        .body(Body::from("File not found"))
+                        .unwrap())
+                }
+            };
             Ok(Response::new(Body::from(file)))
         }
 
@@ -34,7 +39,7 @@ struct Args {
 async fn main() {
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
 
-    let file_svc = make_service_fn(|_conn| async { Ok::<_, Infallible>(service_fn(file)) });
+    let file_svc = make_service_fn(|_conn| async { Ok::<_, std::io::Error>(service_fn(file)) });
 
     let server = Server::bind(&addr).serve(file_svc);
 
