@@ -1,0 +1,15 @@
+[package]
+name = "hy"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name  = "hyp"
+path = "src/main.rs"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+hyper = { version = "0.14", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
+clap = { version = "3.0.14", features = ["derive"] }
+futures = "0.3"
