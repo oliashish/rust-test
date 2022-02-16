@@ -2,25 +2,80 @@ use clap::Parser;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server};
 use hyper::{Method, StatusCode};
-use regex::Regex;
+use std::fs as ft;
 use std::net::SocketAddr;
+use std::path::Path;
 use tokio::fs;
 
 async fn file(req: Request<Body>) -> Result<Response<Body>, std::io::Error> {
-    let _path = Regex::new(r"^/./*").unwrap().as_str();
     match (req.method(), req.uri().path()) {
-        (&Method::GET, _path) => {
+        (&Method::GET, "/") => {
             let args = Args::parse();
-
-            let file = match fs::read(args.name).await {
+            let mut _path = args.name.as_str();
+            let con_type = match ft::metadata(&args.name) {
                 Ok(file) => file,
                 Err(_) => {
                     return Ok(Response::builder()
                         .status(StatusCode::INTERNAL_SERVER_ERROR)
                         .body(Body::from("File not found"))
-                        .unwrap())
+                        .unwrap());
                 }
             };
+            let mut _filename = "";
+            if con_type.is_file() {
+                let file = Path::new(&args.name).file_name().unwrap();
+                _filename = file.to_str().unwrap();
+            }
+
+            let mut file = Vec::new();
+            let mut contents = Vec::new();
+            if con_type.is_dir() {
+                let mut directory = fs::read_dir(&args.name).await?;
+                while let Some(dir) = directory.next_entry().await? {
+                    contents.push(dir.file_name())
+                }
+                // return directory contents of message saying this is a directory
+            } else {
+                file = fs::read(_path).await?;
+            }
+            Ok(Response::new(Body::from(file)))
+        }
+
+        (&Method::GET, _filename) => {
+            let args = Args::parse();
+            let mut _path = args.name.as_str();
+            let mut base_path = Path::new(_path);
+            if _path.contains(".") {
+                base_path = base_path.parent().unwrap();
+            }
+            let mut _filename = _filename;
+            let mut abs_path = format!("{}{}", base_path.to_str().unwrap(), _filename);
+
+            let con_type = match ft::metadata(&abs_path) {
+                Ok(file) => file,
+                Err(_) => {
+                    return Ok(Response::builder()
+                        .status(StatusCode::INTERNAL_SERVER_ERROR)
+                        .body(Body::from("File not found"))
+                        .unwrap());
+                }
+            };
+
+            abs_path = format!("{}{}", base_path.to_str().unwrap(), _filename);
+
+            let mut file = Vec::new();
+
+            let mut contents = Vec::new();
+            if con_type.is_dir() {
+                let mut directory = fs::read_dir(&abs_path).await?;
+                while let Some(dir) = directory.next_entry().await? {
+                    contents.push(dir.file_name())
+                }
+                // return directory contents of message saying this is a directory
+            } else {
+                file = fs::read(&abs_path).await?;
+            }
+
             Ok(Response::new(Body::from(file)))
         }
 
