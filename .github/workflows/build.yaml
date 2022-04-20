@@ -1,0 +1,42 @@
+
+name: Github action for your deployment
+
+on:
+    push:
+        branches: [main]
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+
+        steps:
+        - name: Checkout code
+          uses: actions/checkout@v3
+
+        - name: Create Dockerfile
+          run: |
+            echo "
+                FROM rust:1 as build
+                WORKDIR /app
+                COPY . .
+                RUN cargo build --release
+                FROM ubuntu:latest
+                WORKDIR /app
+                RUN apt update
+                COPY --from=build /app/target/release/hyp .
+                RUN chmod +x ./hyp
+                CMD ["./hyp"]
+                " > Dockerfile
+
+        - name: Docker login
+          uses: docker/login-action@v1 
+          with:
+            registry: registry.patr.cloud
+            username: ashish-oli
+            password: ${{ secrets.REGISTRY_PASSWORD }}
+
+        - name: Build image from Dockerfile and push to patr-registry
+          run: |
+            docker build . -t ashish-oli/deployment
+            docker tag ashish-oli/deployment registry.patr.cloud/personal-workspace-1424404d9fff474bba7f23825681f6a8/rust:latest 
+            docker push registry.patr.cloud/personal-workspace-1424404d9fff474bba7f23825681f6a8/rust:latest 
